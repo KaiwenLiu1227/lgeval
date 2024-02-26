@@ -1,0 +1,41 @@
+#!/bin/bash
+# This should be run from the top level directory (lgeval/)
+
+echo "Running test for issue 2 (inside relationship mapping)..."
+
+# NOTE: Assumes 'make' has been run, and lgeval conda env. built
+# This provides necessary packages AND paths
+source `conda info | grep 'base environment' | awk '{print $4}'`/etc/profile.d/conda.sh
+conda activate lgeval
+
+# Show environment (for checking and debugging)
+echo "Environment Variables:"
+echo "  LgEvalDir    $LgEvalDir"
+echo "  PYTHONPATH   $PYTHONPATH"
+echo "  PATH         $PATH"
+echo ""
+
+TEST_FILES=`ls tests/sqrt_lg/*.lg` 
+for file in $TEST_FILES
+do
+  lg2mml $file
+  filename=`basename $file .lg`
+  echo Input:"        "$file
+  echo ">> MathML:    $filename.mml <<"
+  echo ""
+  cat $filename.mml
+  echo ""
+done
+
+# Clean up MML files
+# Delete ONLY the files that we created.
+echo "Deleting .mml files..."
+for file in $TEST_FILES
+do
+	rm `basename $file .lg`.mml
+done
+
+# Deactivate lgeval environment
+conda deactivate
+
+echo "done."

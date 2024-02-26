@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Without arguments, generate outputs
+if [ $# -eq 0 ]
+then
+	rm -fr Results_*
+	for branch in main repair-io
+	do
+		git checkout $branch
+		rm -f $branch-out
+
+		evaluate tests/io_tests/small-out tests/io_tests/small-GT
+		evaluate tests/io_tests/small-out-missing tests/io_tests/small-GT
+		evaluate tests/io_tests/small-out-extra tests/io_tests/small-GT
+
+		mkdir $branch-out
+		mv Results_* $branch-out
+	done
+fi
+
+# Compare differences, telling user what to look for in each case
+echo "[[ Summary.txt Differences ]]"
+echo "** Only differences in dates should be visible." 
+echo ""
+echo "[[ Press any key to continue ]]"
+read V
+diff repair-io-out/Results_small-out/Summary.txt main-out/Results_small-out/Summary.txt
+diff repair-io-out/Results_small-out-missing/Summary.txt main-out/Results_small-out-missing/Summary.txt
+diff repair-io-out/Results_small-out-extra/Summary.txt main-out/Results_small-out-extra/Summary.txt
+
+echo ""
+echo "[[ Directory differences ]]"
+echo "** New system produces a file (Correct.csv) missing in main branch version."
+echo "** Other differences should be only in dates."
+echo ""
+echo "[[ Press any key to continue ]]"
+read V
+
+echo ""
+diff repair-io-out/Results_small-out/ main-out/Results_small-out/
+diff repair-io-out/Results_small-out-missing/ main-out/Results_small-out-missing/
+diff repair-io-out/Results_small-out-extra/ main-out/Results_small-out-extra/
+
+echo ""
+echo "[[ Individual file .csv/.diff in Metrics/ ]]"
+echo "** No differences should be visible"
+echo "[[ Press any key to continue ]]"
+read V
+
+diff repair-io-out/Results_small-out/FileMetrics.csv main-out/Results_small-out/FileMetrics.csv
+diff repair-io-out/Results_small-out-missing/FileMetrics.csv main-out/Results_small-out-missing/FileMetrics.csv
+diff repair-io-out/Results_small-out-extra/FileMetrics.csv main-out/Results_small-out-extra/FileMetrics.csv
+
+echo "done."
+
+

@@ -1,0 +1,170 @@
+#!/bin/bash
+usage()
+{
+	echo "Usage: confHist (output_dir target_dir) | fileList -gs|--graphSize <value>"
+	echo -e "\t\t[-m|--minCount <value>] [-s|--strokes] [-i|--lgimgDir <directory>]"
+	# echo -e "\t\t[-p|--dotpdfDir <directory>] [--split] [--filter] [-h|--help]"
+	echo -e "\t\t[-p|--dotpdfDir <directory>] [-h|--help]"
+	echo ""
+  echo "------- Required Arguments -------"
+  echo "Note: Use either the output and target directories, or the fileList"
+  echo ""
+  echo "output_dir    				Output lg files directory"
+  echo "target_dir    				Ground truth lg files directory"
+	echo "fileList      				File whose each line contains outputfile_path targetfile_path"
+	echo -e "\t\t\t\t\tis used for comparison."
+	echo ""
+	echo -e "-gs or --graphSize <value> \t\tThe number of objects/primitives in targets to analyze"
+  echo "" 
+  echo "------- Optional Arguments -------"
+	echo -e "-m or --minCount <value> \tThe minimum number of times an error should occur before"
+	echo -e "\t\t\t\tdetailed information is provided in the confusion histogram"
+	echo -e "\t\t\t\tBy default, all errors are shown (minCount = 1)"
+	echo -e "-s or --strokes \t\tConstruct stroke(primitive) confusion histograms in addition"
+	echo -e "\t\t\t\tto object confusion histograms"
+	echo -e "-i or --lgimgDir <directory> \tThe directory containing the expression images of the lg files"
+	echo -e "-p or --dotpdfDir <directory> \tThe directory containing the lg2dot comparison pdf outputs"
+	echo -e "\t\t\t\t If not provided, new lg2dot comparison outputs are generated and used"
+	# echo -e "-sp or --split \t\t\tSeparate the more frequent(>minCount) errors and (<=minCount)"
+	# echo -e "\t\t\t\terrors"
+	# echo -e "-f or --filter \t\t\tIgnore the less frequent(<=minCount) errors"
+	echo -e "-h or --help \t\t\tPrint usage and this help message and exit"
+}
+
+if [ $# -eq 0 ]
+then
+	echo "LgEval confHist: Structure Confusion Histogram Generator"
+	echo "Copyright (c) R. Zanibbi, H. Mouchere, A.K. Shah 2013-2022"
+	echo ""
+	echo "Usage: confHist (output_dir target_dir) | fileList"
+	echo "               -gs|--graphSize <value> -m|--minCount <value>] [-s|--strokes]"
+	echo "               [-i|--lgimgDir <directory>]"
+	# echo -e "\t\t[-p|--dotpdfDir <directory>] [--split] [--filter] [-h|--help]"
+	echo "               [-p|--dotpdfDir <directory>] [-h|--help]"
+	echo ""
+	echo "For details on arguments usage: confHist -h or confHist --help"
+	echo ""
+	echo "Creates an .html file containing structure confusion histograms at the object level."
+	echo "The histograms visualize errors by their frequency when comparing files in output_dir"
+	echo "vs. target_dir (target_dir is 'ground truth')."
+	echo ""
+	echo "It is assumed that every .lg file in output_dir exists in target_dir, and a file"
+	echo "output_dir_vs_target_dir is created as output."
+	echo ""
+	echo "Output is written to the file:"
+	echo "  * confHist_outputs/CH_<output_dir_vs_target_dir__size_<graphSize>_min_<minCount>.html *OR*"
+	echo "  * confHist_outputs/CH_<fileList__size_<graphSize>_min_<minCount>.html"
+	echo ""
+	echo "depending upon the arguments used."
+	exit 0
+fi
+
+GRAPH_SIZE=""
+MIN_COUNT=1
+STROKES=0
+LGIMG_DIR="../"
+DOTPDF_DIR="confHist_outputs/dotpdfs"
+SPLIT=0
+FILTER=1
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+key="$1"
+
+case $key in
+    -h|--help) usage
+    exit 0 
+    ;;
+    -gs|--graphSize)
+    GRAPH_SIZE="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -m|--minCount)
+    MIN_COUNT="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -s|--strokes)
+    STROKES=1
+    shift # past argument
+    ;;
+    -i|--lgimgDir)
+    LGIMG_DIR="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -p|--dotpdfDir)
+    DOTPDF_DIR="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -sp|--split)
+    SPLIT=1
+    shift # past argument
+    ;;
+    -f|--filter)
+    FILTER=1
+    shift # past argument
+    ;;
+    *)    # unknown option
+    POSITIONAL+=("$1") # save it in an array for later
+    shift # past argument
+    ;;
+esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+
+if [[ -z "$GRAPH_SIZE" ]]
+then
+	echo "Error: Please enter graph size using -gs value OR --graphSize value"
+	exit 1
+fi
+
+OUT_DIR="confHist_outputs"
+if [ ! -d $OUT_DIR ]
+then
+	mkdir $OUT_DIR
+fi	
+
+if [ -d $1 ]
+then
+	# Remove trailing slashes.
+	output_dir=${1%/}
+	target_dir=${2%/}
+	base1=`basename $output_dir`
+	base2=`basename $target_dir`
+	INFILE="$OUT_DIR/${base1}_vs_${base2}"
+	
+	# Two directories passed (hopefully).
+	# NOTE: Assumes same number of .lg files with
+	#       matching names.
+	ls $output_dir/*.lg > _f1
+	ls $target_dir/*.lg > _f2
+
+	L1=`wc -l _f1 | awk '{print $1}'` 
+	L2=`wc -l _f2 | awk '{print $1}'`
+	if [ "$L1" != "$L2" ]
+	then
+		echo "  !! Error: differing number of .lg files:"
+		echo "     ($L1) $output_dir"
+		echo "     ($L2) $target_dir"
+		rm -f _f1 _f2
+		exit 1
+	fi
+
+	paste -d" " _f1 _f2 > $INFILE
+	rm -f _f1 _f2 
+	
+	# HACK: ${@:3} selects args starting from the third.
+	python $LgEvalDir/src/confHists.py --fileList $INFILE --graphSize $GRAPH_SIZE \
+		--minCount $MIN_COUNT --strokes $STROKES --lgimgDir $LGIMG_DIR \
+		--dotpdfDir $DOTPDF_DIR --split $SPLIT --filter $FILTER
+	#rm $INFILE
+else
+	# User-provided file list.
+	python $LgEvalDir/src/confHists.py --fileList $@ --graphSize $GRAPH_SIZE \
+		--minCount $MIN_COUNT --strokes $STROKES --lgimgDir $LGIMG_DIR \
+		--dotpdfDir $DOTPDF_DIR --split $SPLIT --filter $FILTER
+fi
+

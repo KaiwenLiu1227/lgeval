@@ -1,0 +1,41 @@
+#!/bin/bash
+
+#Yejing XIE, Mars 2023
+
+# generating symbol level LG files from inkml 
+
+if [ $# -lt 2 ]
+then
+	echo " -----------------------------------------"
+        echo "Usage: mml2lg <inkmldir> <outdir>"
+        echo " -----------------------------------------"
+	exit 0
+fi
+
+OUTDIR=$2
+
+if ! [ -d $OUTDIR ]
+then
+	mkdir $OUTDIR
+fi
+
+
+mkdir lg_temp/
+
+#python3 process_mml.py $1 inkml_temp/
+		
+./batch_mml2lg $1 lg_temp/ 2> perl_warning.txt
+
+python3 update_nodeTags.py lg_temp/ $OUTDIR
+
+
+#remove temp folders
+
+rm -r lg_temp/ 
+	
+
+      
+    
+
+
+

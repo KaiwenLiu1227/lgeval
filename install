@@ -1,0 +1,99 @@
+#!/bin/bash
+
+################################################################
+# Functions
+################################################################
+
+# Report message
+mymsg () {
+	echo "    >> $@"
+	echo ""
+}
+
+# Pass number of arguments sent to outer script and success message to invoke.
+testSuccess () {
+	if [ $? -ne 0 ]
+	then
+		echo ""
+		echo "** Installation error ** -- please review error messages above."
+
+		# Pass any additional argument, program will not halt.
+		if [ $1 -eq 0 ] 
+		then
+		    exit $?
+		else
+		    echo "** Continuing..."
+		    echo ""
+		fi
+	else
+		# Success.
+		mymsg $2
+	fi
+}
+
+
+################################################################
+# LgEval Conda Environment
+################################################################
+
+# Set up Conda environment
+echo "[ Creating LgEval Python Environment ]"
+
+CENV=`conda info --envs`
+if grep -w "lgeval" <<< "$CENV"
+then
+	mymsg "Conda lgeval environment already created."
+else
+	conda create -n lgeval python=3.6.9
+	testSuccess $# "Environment (lgeval) created successfully."
+	CONDSH=`conda info | grep 'base environment' | awk '{print $4}'`/etc/profile.d/conda.sh 
+	source $CONDSH
+	conda activate lgeval
+
+	pip install -r requirements.txt
+	testSuccess $# "Additional packages installed successfully."
+
+	# Set environment variables in scripts run by conda on start/end of activation
+
+	# Define and record existing path definitions
+	LGEVALDIR=`pwd`
+	PARENTDIR=`cd ..;pwd`
+
+	OLDPYTHONPATH=$PYTHONPATH
+	OLDPATH=$PATH
+	OLDLGEVALDIR=$LgEvalDir
+
+	# Create shell files executed on lgeval conda env activate/deactivate
+	cd $CONDA_PREFIX
+	mkdir -p ./etc/conda/activate.d
+	mkdir -p ./etc/conda/deactivate.d
+	ACTIVE_ENV=./etc/conda/activate.d/env_vars.sh
+	DEACTIVE_ENV=./etc/conda/deactivate.d/end_vars.sh
+
+	# Activation script
+	echo "#!/bin/bash" 								> $ACTIVE_ENV
+	echo export LgEvalDir="$LGEVALDIR" 				>> $ACTIVE_ENV
+	echo export PYTHONPATH="$PARENTDIR:$PYTHONPATH" >> $ACTIVE_ENV
+	echo export PATH="$LGEVALDIR/bin:$PATH" 		>> $ACTIVE_ENV
+	echo ""											>> $ACTIVE_ENV
+	echo export OLDLGEVALDIR="$OLDLGEVALDIR"		>> $ACTIVE_ENV
+	echo export OLDPYTHONPATH="$PYTHONPATH" 		>> $ACTIVE_ENV
+	echo export OLDPATH="$PATH" 					>> $ACTIVE_ENV
+
+	# Deactivation script
+	echo "#!/bin/bash" 						> $DEACTIVE_ENV
+	echo export LgEvalDir=$OLDLGEVALDIR 	>> $DEACTIVE_ENV
+	echo export PYTHONPATH=$OLDPYTHONPATH 	>> $DEACTIVE_ENV
+	echo export PATH=$OLDPATH 				>> $DEACTIVE_ENV
+	echo ""									>> $DEACTIVE_ENV
+	echo unset OLDLGEVALDIR 				>> $DEACTIVE_ENV
+	echo unset OLDPYTHONPATH 				>> $DEACTIVE_ENV
+	echo unset OLDPATH 						>> $DEACTIVE_ENV
+
+	mymsg "Created environment variables for lgeval conda shell."
+
+	conda deactivate
+fi
+
+
+

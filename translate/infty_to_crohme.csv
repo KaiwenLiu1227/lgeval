@@ -1,0 +1,180 @@
+# Symbol label and relationship label mappings from INFTY to CROHME
+SYMBOLS
+zero,0
+one,1
+two,2
+three,3
+four,4
+five,5
+six,6
+seven,7
+eight,8
+nine,9
+BigLeftPar,[
+BigRightPar,]
+Delta,\Delta
+LeftPar,(
+MiddleLeftPar,{
+MiddleRightPar,}
+Pi,\Pi
+RightPar,)
+Sigma,Sigma
+alpha,\alpha
+backslash,\
+beta,\beta
+bigcap,\cap
+bigcup,\cup
+cap,\cap
+comma,COMMA
+cup,\cup
+dot,.
+equal,=
+exclamation,!
+exists,\exists
+forall,\forall
+gamma,\gamma
+geq,\geq
+greater,\gt
+in,\in
+infty,\infty
+int,\int
+lambda,\lambda
+ldots,\ldots
+leq,\leq
+less,\lt
+minus,-
+mu,\mu
+notequal,\neq
+omega,\omega
+partial,\partial
+phi,\phi
+pi,\pi
+plus,+
+pm,\pm
+prime,\prime
+psi,\psi
+question,?
+rangle,\gt
+rightarrow,\rightarrow
+semicolon,;
+sigma,\sigma
+slash,/
+sqrt,\sqrt
+subset,\subset 
+sum,\sum
+supset,\supset
+theta,\theta
+times,\times
+varphi,\phi
+vartheta,\theta
+wedge,\wedge
+
+# Not available in mathMLMap
+Psi,&Psi;
+Gamma,&Gamma;
+Lambda,&Lambda;
+Omega,&Omega;
+Phi,&Phi;
+Rightarrow,&Rightarrow;
+Subset,&Subset;
+Theta,&Theta;
+delta,&delta;
+epsilon,&epsilon;
+langle,&langle;
+subseteq,&subseteq;
+tau,&tau;
+Acirc,&Acirc;
+Leftrightarrow,&Leftrightarrow;
+Oslash,&Oslash;
+approx,&approx;
+ast,&ast;
+bigoplus,&bigoplus;
+bigotimes,&bigotimes;
+check,&check;
+chi,&chi;
+circ,&circ;
+colon,&colon;
+cong,&cong;
+downarrow,&downarrow;
+emptyset,&emptyset;
+equiv,&equiv;
+eta,&eta;
+geqq,&geqq;
+gg,&gg;
+hookrightarrow,&hookrightarrow;
+iota,&iota;
+kappa,&kappa;
+lceil,&lceil;
+leftarrow,&leftarrow;
+leqq,&leqq;
+ll,&ll;
+mapsto,&mapsto;
+nabla,&nabla;
+ni,&ni;
+nmid,&nmid;
+notin,&notin;
+nu,&nu;
+oint,&oint;
+ominus,&ominus;
+oplus,&oplus;
+otimes,&otimes;
+perp,&perp;
+prec,&prec;
+prod,&prod;
+rceil,&rceil;
+rho,&rho;
+sharp,&sharp;
+sim,&sim;
+simeq,&simeq;
+succ,&succ;
+supseteq,&supseteq;
+tilde,&tilde;
+triangle,&triangle;
+upsilon,&upsilon;
+vert,|
+xi,&xi;
+zeta,&zeta;
+
+# Not available in mathMLMap and mathML
+# Ahat
+# D
+# DoubleBeginQuartation
+# J
+# K
+# NULL
+# O
+# Q
+# Reject1
+# Reject2
+# Reject3
+# SingleEndQuartation
+# U
+# W
+# Z
+# doubleprime
+# fi
+# hat
+# ihat
+# iint
+# longHyphen
+# notequiv
+# notsimeq
+# notsubset
+# subsetnoteqq
+# supsetnoteqq
+# tripleprime
+# ttilde
+# underbrace
+# underline
+# vec
+# _
+
+RELATIONSHIPS
+RSUP,Sup
+HORIZONTAL,Right
+RSUB,Sub
+UNDER,Below
+LSUB,Sub
+UPPER,Above
+LSUP,Sup
+PUNC,Right

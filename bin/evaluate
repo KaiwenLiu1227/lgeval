@@ -1,0 +1,316 @@
+#!/bin/bash
+
+# Make sure that CROHMELibDir and LgEvalDir are defined in
+# your shell enviroment, e.g. by including:
+#	
+#	export LgEvalDir=<path_to_LgEval>
+#	export CROHMELibDir=<path_to_CROHMELib>       		
+#	export PATH=$PATH:$CROHMELibDir/bin:$LgEvalDir/bin
+# 
+# in your .bashrc file (the initialization file for bash shell). The PATH
+# alteration will add the tools to your search path. 
+
+if [ $# -lt 1 ]
+then
+	echo "LgEval evaluate: Label graph evaluation tool"
+	echo "Copyright (c) R. Zanibbi, H. Mouchere, M. Mahdavi, A.K. Shah 2012-2022"
+	echo ""
+	echo "Usage: evaluate outputDir groundTruthDir [p/t/d/s/b] [png/pdf/both] OR"
+	echo "       evaluate fileList [p/t/d/s/b] [png/pdf/both]"
+	echo ""
+	echo "Evaluates label graph (.lg) files in outputDir against the same files"
+	echo "in groundTruthDir. groundTruthDir defines the list of files to be compared"
+	echo "(i.e. if a file is not in the ground truth directory, it is ignored."
+	echo ""
+	echo "If a list of file pairs is provided ('output target' provided on each line)"
+	echo "then these file pairs are used for evaluation."
+	echo ""
+	echo "The final optional arguments define the graph type to use in visualizing"
+	echo "errors, and their output format. Run 'lg2dot' for more on graph types."
+	exit 0
+fi
+
+DOTARG=""
+BNAME=`basename $1`
+MODE="Dir"
+FORMAT="pdf"
+TARGETS=""
+TARGET_COUNT=0
+OUTPUTS=""
+NL=$'\n'
+
+OUTCOME_LIST=""
+ResultsDir=Results_$BNAME
+MULTI_PASS_WARN=0
+
+################################################################
+# Compile the list of output files and ground truth files.
+#
+# NOTE: Ground truth files define the evaluation set, extra 
+# output files are ignored.
+################################################################
+
+echo ""
+echo "[ LgEval evaluate ]"
+echo ""
+
+# Case 1: Passed a list of file pairs
+if ! [ -d $1 ]
+then
+	MODE="List"
+
+	LABEL_STRING="List File: $1"
+	echo "$LABEL_STRING"
+
+	# Get the targets
+	OUTPUTS=`awk '{ print $1; }' $1`
+	OUTARR=($OUTPUTS)
+	TARGETS=`awk '{ print $2; }' $1`
+
+	# Grab additional flags
+	if [ $# -gt 1 ]
+	then
+		DOTARG=$2
+	fi
+	if [ $# -gt 2 ]
+	then
+		FORMAT=$3
+	fi
+
+# Case 2: Passed a pair of directories
+else
+	OUT_STRING="Output File Directory:  $1"
+	GT_STRING="Ground Truth Directory: $2"
+	# Peculiar '$<string>' syntax is to preserve the newline.
+	LABEL_STRING=$(printf '%s\n%s' "$OUT_STRING" "$GT_STRING")
+	echo "$LABEL_STRING"
+
+	OUTPUTS=`ls $1/*.lg`
+	TARGETS=`ls $2/*.lg`
+
+	# Grab additional flags
+	if [ $# -gt 2 ]
+	then
+		DOTARG=$3
+	fi
+
+	# RZ: Debug -- output type ignored
+	if [ $# -gt 3 ]
+	then
+		FORMAT=$4
+	fi
+fi
+echo "* LgEval Results Directory: $ResultsDir"
+
+TARGET_COUNT=$((`echo $TARGETS | wc -w`))
+
+
+################################################################
+# Create output directory structure, compile class labels
+################################################################
+if ! [ -d $ResultsDir ]
+then
+	mkdir $ResultsDir
+	mkdir $ResultsDir/Metrics
+
+	# Create directories for dot error visualizations
+	if [ "$DOTARG" != "" ]
+	then
+		# RZ Debug: deleting FORMAT assignment (done above)
+		mkdir $ResultsDir/errorGraphs
+		mkdir $ResultsDir/errorGraphs/dot
+		if [ "$FORMAT" == "pdf" ]; then
+			mkdir $ResultsDir/errorGraphs/pdf
+		elif [ "$FORMAT" == "png" ]; then
+			mkdir $ResultsDir/errorGraphs/png
+		elif [ "$FORMAT" == "both" ]; then
+			mkdir $ResultsDir/errorGraphs/pdf
+			mkdir $ResultsDir/errorGraphs/png
+		fi
+	fi
+fi
+
+# Compile labels from ground truth. This is needed for confusion matrices to
+# be properly defined, and for sanity checking results.
+echo "$TARGETS" > $ResultsDir/temp_file_list
+python3 $LgEvalDir/src/compileLabels.py "$ResultsDir/temp_file_list" > "$ResultsDir/labelsGT.txt"
+echo "$OUTPUTS" > $ResultsDir/temp_file_list
+python3 $LgEvalDir/src/compileLabels.py "$ResultsDir/temp_file_list" > "$ResultsDir/labelsOutput.txt"
+rm $ResultsDir/temp_file_list
+
+
+################################################################
+# Evaluate files
+################################################################
+
+# Compute all .csv metrics outputs (per-file), and .diff results (per-file).
+echo ""
+echo "Evaluating..."
+
+# Iterate over ground truth files
+INDEX=0
+for file in $TARGETS
+do
+	FNAME=`basename $file .lg`
+	nextFile="_ERROR_"
+	if [ $MODE == "Dir" ]
+	then
+		nextFile=`echo "$1/$FNAME.lg" | perl -p -e "s/\/\//\//g"`
+	else
+		# Index to the next input file.
+		nextFile=${OUTARR[INDEX]}
+	fi
+
+	if  [[ ! -e $ResultsDir/Metrics/$FNAME.csv ]]
+	then
+		# NOTE: the script convertCrohmeLg can be used to convert
+		#       crohme .inkml files to .lg files.
+		CORRECT="Correct"
+
+		# RZ: Run evaluation once vs. twice
+		OUT=`python3 $LgEvalDir/src/evallg.py $nextFile $file INTER`
+
+		# Match asterisk at beginning of line to select differences/errors
+		# WARNING: Double quotes are important to preserve newlines!
+		# Only create DIFF files for differences.
+		DIFF=`echo "$OUT" | grep "\*"`
+		if [ -n "$DIFF" ]
+		then
+			echo "$DIFF" > $ResultsDir/Metrics/$FNAME.diff
+		fi
+		echo "$OUT" | grep -v "\*" > $ResultsDir/Metrics/$FNAME.csv
+
+		# If differences reported, record files with errors, generate visualizations
+		if [ "$DIFF" != "" ]
+		then
+			CORRECT="Incorrect"
+
+			# If a third argument is provided, generate a .pdf file to visualize
+			# differences between graphs.
+			if [ "$DOTARG" != "" ]
+			then
+				if [ "$DOTARG" == "d" ]
+				then
+					lg2dot $nextFile $file --format $FORMAT
+				else
+					lg2dot $nextFile $file --graph_type "$DOTARG" --format $FORMAT
+				fi
+
+				mv $FNAME.dot $ResultsDir/errorGraphs/dot
+				if [ "$FORMAT" == "pdf" ]; then
+					mv $FNAME.pdf $ResultsDir/errorGraphs/pdf
+				elif [ "$FORMAT" == "png" ]; then
+					mv $FNAME.png $ResultsDir/errorGraphs/png
+				elif [ "$FORMAT" == "both" ]; then
+					mv $FNAME.pdf $ResultsDir/errorGraphs/pdf
+					mv $FNAME.png $ResultsDir/errorGraphs/png
+				fi
+			fi
+		fi
+
+		# Record whether file was correct or not.
+		if [ $((INDEX)) == 0 ]
+		then
+			OUTCOME_LIST="$nextFile, $CORRECT"
+		else
+			OUTCOME_LIST=`printf "%s\n%s" "$OUTCOME_LIST" "$nextFile, $CORRECT"`
+		fi
+	else
+		if [ $((MULTI_PASS_WARN)) == 0 ]
+		then
+			echo "  * Already processed: $file"
+			echo "    (message suppressed for other files)"
+			MULTI_PASS_WARN=1
+		fi
+	fi
+
+	INDEX=$((INDEX+1))
+	PERCENT=`echo "scale=1; 100 * $INDEX / $TARGET_COUNT" | bc`
+	
+	if [ $((`expr $INDEX % 1`)) == 0 ]
+	then
+		echo -ne "  $PERCENT% complete ($INDEX of $TARGET_COUNT)\r"
+	fi
+done
+echo -ne "  $PERCENT% complete ($INDEX of $TARGET_COUNT)\r"
+
+
+################################################################
+# Compile metrics 
+# Including summaries and confusion matrices
+#
+# Stored as individual files to prevent re-computation for user
+################################################################
+
+if [ -n "$OUTCOME_LIST" ]
+then
+	# Need to avoid adding empty entries in Correct.csv, and sort by filename
+	echo "$OUTCOME_LIST" >> $ResultsDir/Correct.csv
+	sort -o $ResultsDir/Correct.csv $ResultsDir/Correct.csv
+fi
+cat $ResultsDir/Metrics/*.csv > $ResultsDir/$BNAME.csv
+
+ALLDIFFS=`ls $ResultsDir/Metrics | grep .diff`
+if [ -n "$ALLDIFFS" ]
+then
+	cat $ResultsDir/Metrics/*.diff > $ResultsDir/$BNAME.diff
+else
+	touch $ResultsDir/00_NoErrors
+	touch $ResultsDir/$BNAME.diff  # empty - no errors.
+fi
+
+# Compute summaries 
+python3 $LgEvalDir/src/sumMetric.py "$LABEL_STRING" $ResultsDir/$BNAME.csv > \
+	$ResultsDir/Summary.txt
+python3 $LgEvalDir/src/sumDiff.py $ResultsDir/$BNAME.diff $ResultsDir/labelsGT.txt html > \
+	$ResultsDir/ConfusionMatrices.html
+python3 $LgEvalDir/src/sumDiff.py $ResultsDir/$BNAME.diff $ResultsDir/labelsGT.txt  > \
+	$ResultsDir/ConfusionMatrices.csv
+
+
+################################################################
+# Create FileMetrics.csv and summary spreadsheet
+################################################################
+# Use awk and head to select every odd (headers) and even (data) columns,
+# Concatenate one header row with data contents.
+awk -F',' '{ for (i=1;i<=NF;i+=2) printf ("%s%c", $i, i + 2 <= NF ? "," : "\n")}' $ResultsDir/$BNAME.csv > $ResultsDir/Headers.csv
+awk -F',' '{ for (i=2;i<=NF;i+=2) printf ("%s%c", $i, i + 2 <= NF ? "," : "\n")}' $ResultsDir/$BNAME.csv > $ResultsDir/Data.csv
+
+# Obtain first row for data labels; insert a "File" label in the first column.
+head -n 1 $ResultsDir/Headers.csv > $ResultsDir/HeaderRow.csv
+HEAD=`cat $ResultsDir/HeaderRow.csv`
+echo "File,Result,$HEAD" > $ResultsDir/HeaderRow.csv
+
+# Combine file names with raw data metrics, then add header labels.
+paste -d , $ResultsDir/Correct.csv $ResultsDir/Data.csv > $ResultsDir/DataNew.csv
+cat $ResultsDir/HeaderRow.csv $ResultsDir/DataNew.csv > $ResultsDir/FileMetrics.csv
+
+
+##################################
+# Clean up 
+##################################
+rm -f $ResultsDir/Headers.csv $ResultsDir/HeaderRow.csv $ResultsDir/Data.csv
+rm -f $ResultsDir/DataNew.csv 
+# RZ: not deleting Correct.csv, to insure that all files are present.
+#rm -f $ResultsDir/Correct.csv
+rm -f $ResultsDir/$BNAME.csv $ResultsDir/$BNAME.diff
+
+
+##################################
+# Remind user of outputs
+##################################
+echo ""
+echo "done."
+echo ""
+echo "$ResultsDir/ contents:"
+echo "   Summary.txt     --   Readable metrics summary"
+echo "   Correct.csv     --   Records which files are correct/incorrect"
+echo "   graphErrors/    --   Error graph visualizations (if requested)"
+echo "   labelsOut.txt   --   Node & edge labels in output files"
+echo "   labelsGT.txt    --   Node & edge labels in ground truth files"
+echo "   FileMetrics.csv --   Raw metrics file"
+echo "   ConfusionMatrices.html  -- Readable web page with confusion matrices (HTML)"
+echo "   ConfusionMatrices.csv   -- Confusion matrix (CSV format)"
+echo "   Metrics/                -- Individual file metrics (.csv) & differences (.diff)"
+echo ""
+
