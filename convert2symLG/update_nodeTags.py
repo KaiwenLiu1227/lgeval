@@ -116,7 +116,10 @@ if __name__=='__main__':
 
     for lgfile in FILES:
         #print(lgfile)
-        update_LG_node_grouping(lgfile,outDir)        
+        try:
+            update_LG_node_grouping(lgfile,outDir)
+        except:
+            print("failed convert lg")
     
     
     

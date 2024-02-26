@@ -206,8 +206,10 @@ if __name__=='__main__':
             clean_mml=remove_unknown_tags(body)
             clean_mml = norm_mn(clean_mml)
             id_mml=add_ID(clean_mml)
-        
-            write_mml(id_mml,name,outDir)
+            try:
+                write_mml(id_mml,name,outDir)
+            except:
+                print("failed convert mml")
             
         else: 
             print('math tag not found for: ',name)
